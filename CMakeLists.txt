@@ -45,11 +45,45 @@ option(enable_doc       "Add target 'doc' to build Doxygen documentation" OFF)
 option(enable_examples  "Build examples" ON)
 option(enable_fortran   "Build Fortran interface" ${enable_fortran_xSDK})
 option(enable_tests     "Build tests" ON)
-option (BUILD_SHARED_LIBS "shared/static" OFF)
+option(BUILD_SHARED_LIBS "shared/static" OFF)
 
-include (GNUInstallDirs)
-include (CheckLibraryExists)
+option (LONGINT "use 64-bit integers for indexing sparse matrices (default is 32-bit)" OFF)
+
+#-- BLAS
+option(TPL_ENABLE_INTERNAL_BLASLIB  "Build the CBLAS library" ${enable_internal_blaslib})
+option(TPL_BLAS_LIBRARIES "List of absolute paths to blas libraries [].")
+
+# global modules
+include(CTest)
+include(GNUInstallDirs)
+include(FeatureSummary)
+include(CheckLibraryExists)
+
+# set install targets
+set(INSTALL_RUNTIME_DIR ${CMAKE_INSTALL_BINDIR})
+set(INSTALL_CONFIG_DIR  ${CMAKE_INSTALL_LIBDIR}/cmake/superlu_mt)
+set(INSTALL_PKGCONFIG_DIR  ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
+set(INSTALL_LIBRARY_DIR ${CMAKE_INSTALL_LIBDIR})
+set(INSTALL_INCLUDE_DIR ${CMAKE_INSTALL_INCLUDEDIR}/superlu_mt)
+
 check_library_exists(m sin "" HAVE_LIB_M)
+
+# export all symbols
+if(BUILD_SHARED_LIBS)
+    set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
+endif()
+
+#---- set RPATH handling
+if(NOT APPLE)
+  set(CMAKE_INSTALL_RPATH $origin)
+endif()
+
+# add the automatically determined parts of the RPATH
+# which point to directories outside the build tree to the install RPATH
+set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+
+# set a debug postfix
+set(CMAKE_DEBUG_POSTFIX "d")
 
 ######################################################################
 #
@@ -58,60 +92,67 @@ check_library_exists(m sin "" HAVE_LIB_M)
 ######################################################################
 #
 ###find_package (BLAS REQUIRED)
-#-- BLAS
-option(TPL_ENABLE_INTERNAL_BLASLIB  "Build the CBLAS library" ${enable_internal_blaslib})
-option(TPL_BLAS_LIBRARIES "List of absolute paths to blas libraries [].")
 
-if(NOT enable_internal_blaslib)
+#--------------------- BLAS ---------------------
+if(NOT TPL_ENABLE_INTERNAL_BLASLIB)
+  # Use explicit supplied BLAS library
   if (TPL_BLAS_LIBRARIES)
     set(BLAS_FOUND TRUE)
+    message("-- Using TPL_BLAS_LIBRARIES='${TPL_BLAS_LIBRARIES}'")
+    set(BLAS_LIB ${TPL_BLAS_LIBRARIES})
+
+  # use cmake to find BLAS
   else()
     find_package(BLAS)
+
+    # if found, set the BLAS_LIB for linking into the library later
     if (BLAS_FOUND)
-      set(TPL_BLAS_LIBRARIES "${BLAS_LIBRARIES}" CACHE FILEPATH
-        "Set from FindBLAS.cmake BLAS_LIBRARIES." FORCE)
+      
+      set(BLAS_LIB BLAS::BLAS)
+
+      # logic to determine type of BLAS and import it directly if possible. Importing directly populates more 
+      # information about the import library than FindBLAS does. This is important in windows where we need to 
+      # know the location of the imported DLL.
+      if(BLAS_LIBRARIES MATCHES "[Oo][Pp][Ee][Nn][Bb][Ll][Aa][Ss]")
+        message(STATUS "Using OpenBLAS import library.")
+        find_package(OpenBLAS REQUIRED)
+        set(BLAS_LIB OpenBLAS::OpenBLAS)
+
+      # add more logic to directly import other BLAS implementations
+      else()
+        message(STATUS "Using cmake found BLAS.")
+      endif()
     endif()
+
   endif()
 endif()
 
-if(BLAS_FOUND)
-  message("-- Using TPL_BLAS_LIBRARIES='${TPL_BLAS_LIBRARIES}'")
-  set(CMAKE_C_FLAGS "-DUSE_VENDOR_BLAS ${CMAKE_C_FLAGS}")
-  set(BLAS_LIB ${TPL_BLAS_LIBRARIES})
-  # fix up BLAS library name
-  string (REPLACE ";" " " BLAS_LIB_STR "${BLAS_LIB}")
-  set(BLAS_LIB_EXPORT ${BLAS_LIB_STR})
-else()
+# Build the internal BLAS as static library
+if(NOT BLAS_FOUND)
   message("-- Did not find or specify BLAS so configure to build internal CBLAS ...")
-  add_subdirectory(CBLAS)
+  #add_subdirectory(CBLAS)
   set(BLAS_LIB blas)
-  if (BUILD_SHARED_LIBS)  # export to be referenced by downstream makefile
-      set(BLAS_LIB_EXPORT ${CMAKE_INSTALL_PREFIX}/CBLAS/libblas.so)
-  else()
-      set(BLAS_LIB_EXPORT ${CMAKE_INSTALL_PREFIX}/CBLAS/libblas.a)
-  endif()
 endif()
 
+# get threads and openmp packages
+find_package(Threads)
+find_package(OpenMP)
 
-set (PLAT "_PTHREAD" CACHE STRING "threading flavor _PTHREAD/_OPENMP")
-if (PLAT STREQUAL "_PTHREAD")
-  find_package (Threads REQUIRED)
-elseif (PLAT STREQUAL "_OPENMP")
-  find_package (OpenMP REQUIRED)
-else ()
-  message (SEND_ERROR "invalid PLAT setting")
-endif ()
-
-option (LONGINT "use 64-bit integers for indexing sparse matrices (default is 32-bit)" OFF)
+if(Threads_FOUND)
+  set(PT "_PTHREAD")
+endif()
+if(OpenMP_FOUND)
+  set(OMP "_OPENMP")
+endif()
+if(NOT (Threads_FOUND OR OpenMP_FOUND))
+  message(SEND_ERROR "missing Threads and OpenMP")
+endif()
 
 enable_language(C)
-if (enable_fortran)
+if(enable_fortran)
   enable_language(Fortran)
 endif()
 set(SUPERLU_MT_VERSION "${PROJECT_VERSION}")
-
-
-set (SUPERLUMT_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR}/superlu_mt CACHE STRING "include dir")
 
 add_subdirectory(SRC)
 add_subdirectory(EXAMPLE)
@@ -124,3 +165,4 @@ endif()
 if (enable_doc)
    add_subdirectory(DOC)
 endif()
+

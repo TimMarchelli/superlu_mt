@@ -1,0 +1,13 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+if(NOT 
+  ((TARGET superlu_mt::superlu_mt@PT@) 
+  AND 
+  (TARGET superlu_mt::sulerlu_mt@OMP@))
+)
+  include(${CMAKE_CURRENT_LIST_DIR}/superlu_mtTargets.cmake)
+endif()
+
+check_required_components(superlu_mt)

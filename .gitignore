@@ -2,3 +2,5 @@
 
 .dropbox.attr
 
+build/
+.vscode/
