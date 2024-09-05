@@ -28,7 +28,7 @@ at the top-level directory.
  * 
  */
 #include <stdlib.h> /* for getenv and atoi */
-#include <unistd.h>
+#include <getopt.h>
 #include "slu_mt_cdefs.h"
 
 

@@ -18,7 +18,7 @@ at the top-level directory.
  */
 #include "slu_mt_sdefs.h"
 
-#include <unistd.h>
+#include <getopt.h>
 
 int
 main(int argc, char *argv[])

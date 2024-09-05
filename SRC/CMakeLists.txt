@@ -1,3 +1,24 @@
+# check the compiler to determine the pragma to use
+if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+  set(SUPPORT_GCC_IVDEP TRUE)
+elseif(CMAKE_C_COMPILER_ID STREQUAL "MSVC")
+  set(SUPPORT_LOOP_IVDEP TRUE)
+elseif((CMAKE_C_COMPILER_ID STREQUAL "Clang") OR ((CMAKE_C_COMPILER_ID STREQUAL "AppleClang")))
+  set(SUPPORT_LOOP_VECTORIZE TRUE)
+elseif((CMAKE_C_COMPILER_ID STREQUAL "IntelLLVM") OR (CMAKE_C_COMPILER_ID STREQUAL "Intel"))
+  set(SUPPORT_IVDEP TRUE)
+endif()
+
+# setup the define to set correct pragma
+if(SUPPORT_IVDEP)
+  set(SLU_MT_DEFINE_IVDEP "SUPPORT_IVDEP")
+elseif(SUPPORT_LOOP_IVDEP)
+  set(SLU_MT_DEFINE_IVDEP "SUPPORT_LOOP_IVDEP")
+elseif(SUPPORT_GCC_IVDEP)
+  set(SLU_MT_DEFINE_IVDEP "SUPPORT_GCC_IVDEP")
+elseif(SUPPORT_LOOP_VECTORIZE)
+  set(SLU_MT_DEFINE_IVDEP "SUPPORT_LOOP_VECTORIZE")
+endif()
 
 file (GLOB sources "*.c")
 
@@ -35,8 +56,14 @@ foreach(SUF ${PT} ${OMP})
       $<INSTALL_INTERFACE:include>
   )
 
+  # add definition for loop vectorization
+  target_compile_definitions(superlu_mt${SUF} PRIVATE ${SLU_MT_DEFINE_IVDEP})
+
   # create an alias
   add_library(superlu_mt::superlu_mt${SUF} ALIAS superlu_mt${SUF})
+
+  # disable compiler warnings
+  disable_target_compiler_warnings(superlu_mt${SUF})
 endforeach()
 
 if(Threads_FOUND)
@@ -50,38 +77,30 @@ endif ()
 
 # Install targets
 foreach(SUF ${PT} ${OMP})
-  install(TARGETS superlu_mt${SUF} DESTINATION ${CMAKE_INSTALL_LIBDIR})
+  install(TARGETS superlu_mt${SUF}
+    EXPORT superlu_mtTargets
+    RUNTIME DESTINATION ${INSTALL_RUNTIME_DIR}
+    LIBRARY DESTINATION ${INSTALL_LIBRARY_DIR}
+    ARCHIVE DESTINATION ${INSTALL_LIBRARY_DIR}
+    INCLUDES DESTINATION ${INSTALL_INCLUDE_DIR}
+  )
 endforeach()
 
-file(GLOB headers "*.h")
+set(headers
+  colamd.h
+  pxgstrf_synch.h
+  slu_dcomplex.h
+  slu_mt_cdefs.h
+  slu_mt_Cnames.h
+  slu_mt_ddefs.h
+  slu_mt_machines.h
+  slu_mt_sdefs.h
+  slu_mt_util.h
+  slu_mt_zdefs.h
+  slu_scomplex.h
+  supermatrix.h
+)
 install(FILES ${headers} DESTINATION ${INSTALL_INCLUDE_DIR})
-
-# install suplerlu_mt
-if(Threads_FOUND AND OpenMP_FOUND)
-  install(TARGETS superlu_mt_PTHREAD superlu_mt_OPENMP
-    EXPORT superlu_mtTargets
-    RUNTIME DESTINATION ${INSTALL_RUNTIME_DIR}
-    LIBRARY DESTINATION ${INSTALL_LIBRARY_DIR}
-    ARCHIVE DESTINATION ${INSTALL_LIBRARY_DIR}
-    INCLUDES DESTINATION ${INSTALL_INCLUDE_DIR}
-  )
-elseif(Threads_FOUND)
-  install(TARGETS superlu_mt_PTHREAD
-    EXPORT superlu_mtTargets
-    RUNTIME DESTINATION ${INSTALL_RUNTIME_DIR}
-    LIBRARY DESTINATION ${INSTALL_LIBRARY_DIR}
-    ARCHIVE DESTINATION ${INSTALL_LIBRARY_DIR}
-    INCLUDES DESTINATION ${INSTALL_INCLUDE_DIR}
-  )
-else()
-  install(TARGETS superlu_mt_OPENMP
-    EXPORT superlu_mtTargets
-    RUNTIME DESTINATION ${INSTALL_RUNTIME_DIR}
-    LIBRARY DESTINATION ${INSTALL_LIBRARY_DIR}
-    ARCHIVE DESTINATION ${INSTALL_LIBRARY_DIR}
-    INCLUDES DESTINATION ${INSTALL_INCLUDE_DIR}
-  )
-endif()
 
 install(FILES ${headers}
   DESTINATION ${INSTALL_INCLUDE_DIR}

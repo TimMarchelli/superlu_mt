@@ -11,6 +11,7 @@ at the top-level directory.
 
 #include "slu_mt_sdefs.h"
 
+#include "slu_mt_internal.h"
 
 int_t
 psgstrf_copy_to_ucol(
@@ -81,7 +82,7 @@ psgstrf_copy_to_ucol(
 	    	fsupc = xsup[ksupno];
 	        isub = xlsub[fsupc] + kfnz - fsupc;
 	        segsze = krep - kfnz + 1;
-#pragma ivdep
+SLU_MT_PRAGMA_IVDEP
 		for (i = 0; i < segsze; i++) {
 		    irow = lsub[isub];
 		    usub[nextu] = perm_r[irow];

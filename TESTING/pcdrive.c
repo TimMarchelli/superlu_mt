@@ -9,7 +9,8 @@ The source code is distributed under BSD license, see the file License.txt
 at the top-level directory.
 */
 
-#include <strings.h>
+#include <string.h>
+#include <getopt.h>
 #include "slu_mt_cdefs.h"
 
 #define NTESTS    5    /* Number of test types */
@@ -148,7 +149,7 @@ int main(int argc, char *argv[])
 	    fprintf(stderr, "expert: cannot allocate " IFMT " bytes\n", lwork);
 	    exit (-1);
 	}
-	bzero(work, lwork);
+	memset(work, '\0', lwork);
     }
 
 #if ( DEBUGlevel>=1 )
@@ -531,7 +532,7 @@ int main(int argc, char *argv[])
 				    Destroy_SuperNode_SCP(&L);
 				    Destroy_CompCol_NCP(&U);
 				} else if ( lwork > 0 ) {
-				    bzero(work, lwork);
+				    memset(work, '\0', lwork);
 				    /*for (i = 0; i < lwork; ++i) 
 				        ((char*)work)[i] = 0;*/
 	                            Destroy_SuperMatrix_Store(&L);
@@ -545,7 +546,7 @@ int main(int argc, char *argv[])
 			        Destroy_SuperNode_SCP(&L);
 				Destroy_CompCol_NCP(&U);
 			    } else if ( lwork > 0 ) {
-			        bzero(work,lwork);
+			        memset(work, '\0', lwork);
 			        /*for (i = 0; i < lwork; ++i)
 				   ((char*)work)[i] = 0;*/
 	                        Destroy_SuperMatrix_Store(&L);

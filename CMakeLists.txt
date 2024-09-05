@@ -58,6 +58,7 @@ include(CTest)
 include(GNUInstallDirs)
 include(FeatureSummary)
 include(CheckLibraryExists)
+include(cmake/DisableTargetCompilerWarnings.cmake)
 
 # set install targets
 set(INSTALL_RUNTIME_DIR ${CMAKE_INSTALL_BINDIR})
@@ -91,7 +92,6 @@ set(CMAKE_DEBUG_POSTFIX "d")
 #
 ######################################################################
 #
-###find_package (BLAS REQUIRED)
 
 #--------------------- BLAS ---------------------
 if(NOT TPL_ENABLE_INTERNAL_BLASLIB)
@@ -136,17 +136,25 @@ endif()
 
 # get threads and openmp packages
 find_package(Threads)
-find_package(OpenMP)
-
 if(Threads_FOUND)
-  set(PT "_PTHREAD")
+  if(CMAKE_USE_PTHREADS_INIT)
+    set(PT "_PTHREAD")
+  else()
+    message(STATUS "No pthreads, disabling threads version.")
+    unset(Threads_FOUND)
+  endif()
 endif()
+
+find_package(OpenMP)
 if(OpenMP_FOUND)
   set(OMP "_OPENMP")
 endif()
 if(NOT (Threads_FOUND OR OpenMP_FOUND))
   message(SEND_ERROR "missing Threads and OpenMP")
 endif()
+
+# get wingetopt package
+find_package(wingetopt)
 
 enable_language(C)
 if(enable_fortran)
